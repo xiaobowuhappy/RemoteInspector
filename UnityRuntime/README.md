@@ -3,27 +3,7 @@
 ## 📁 项目结构
 
 ```
-I:\Trunk\RemoteInspector\
-├── Editor\                          # 编辑器端代码
-│   ├── Core\                        # 服务器核心
-│   │   ├── RemoteInspectorServer.cs     # TCP服务器，管理所有连接
-│   │   ├── InspectorConnection.cs        # 单个客户端连接处理
-│   │   ├── MessageDispatcher.cs          # 消息分发器
-│   │   └── FileUploadHandler.cs         # 文件上传处理
-│   ├── Data\                        # 数据结构
-│   │   ├── NodeTreeData.cs              # 节点树数据
-│   │   ├── ComponentData.cs             # 组件数据
-│   │   ├── MaterialData.cs              # 材质数据
-│   │   └── FrameStatsData.cs            # FPS统计数据
-│   ├── Styles\                      # UI样式
-│   │   └── RemoteInspectorStyles.cs      # IMGUI统一样式
-│   └── Windows\                     # 窗口面板
-│       ├── RemoteInspectorWindow.cs     # 主窗口（入口）
-│       ├── NodeTreePanel.cs             # 节点树
-│       ├── InspectorPanel.cs            # 属性检视器
-│       ├── FpsGraphPanel.cs            # FPS图表
-│       ├── FileUploadPanel.cs           # 文件上传
-│       └── ConnectionPanel.cs          # 连接设置
+RemoteInspector\
 ├── Runtime\                         # 运行时代码（打入游戏包）
 │   ├── Core\                        # 客户端核心
 │   │   ├── RemoteInspectorClient.cs     # TCP客户端
