@@ -1,8 +1,8 @@
-﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:local="clr-namespace:RemoteInspector.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="RemoteInspector.Desktop.MainWindow" Style="{StaticResource {x:Type Window}}" Title="Remote Inspector · 独立调试工具" Width="1480" Height="940" MinWidth="1080" MinHeight="780" Closing="OnClosing">
+﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:local="clr-namespace:RemoteInspector.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="RemoteInspector.Desktop.MainWindow" Style="{StaticResource {x:Type Window}}" Title="Remote Inspector · 独立调试工具" Width="1480" Height="940" MinWidth="1080" MinHeight="780" Closing="OnClosing" PreviewKeyDown="MainNavigation_KeyDown">
     <Window.Resources>
         <HierarchicalDataTemplate DataType="{x:Type local:TreeRow}" ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal" ToolTip="{Binding Tooltip}">
-                <TextBlock Text="{Binding Label}" Foreground="{Binding NameColor}" VerticalAlignment="Center" Margin="0,2,7,2" />
+                <TextBlock local:SearchHighlight.Text="{Binding Label}" Foreground="{Binding NameColor}" VerticalAlignment="Center" Margin="0,2,7,2" />
                 <Border Background="{Binding StateBackground}" CornerRadius="3" Padding="5,1">
                     <TextBlock Text="{Binding StateLabel}" Foreground="{Binding StateColor}" FontSize="11" VerticalAlignment="Center" />
                 </Border>
@@ -14,37 +14,45 @@
     </Window.Resources>
     <DockPanel Margin="10" Background="#141A23">
         <StackPanel DockPanel.Dock="Top">
-            <DockPanel>
-                <TextBlock Text="REMOTE INSPECTOR" FontSize="22" FontWeight="SemiBold" />
-                <TextBlock Text="WPF / TCP" Foreground="#85ACC9" HorizontalAlignment="Right" VerticalAlignment="Center" />
-            </DockPanel>
-            <WrapPanel Margin="0,12,0,6">
-                <TextBlock Text="监听端口" VerticalAlignment="Center" />
-                <TextBox x:Name="PortBox" Text="9555" Width="72" />
-                <Button x:Name="ListenButton" Content="启动监听" Click="Listen_Click" />
-                <ComboBox x:Name="SessionsBox" Width="290" DisplayMemberPath="DisplayName" SelectionChanged="Session_Changed" />
-                <Button Content="断开所选会话" Click="Disconnect_Click" />
-                <Button Content="暂停" Tag="PAUSE_CLIENT" Click="Control_Click" />
-                <Button Content="恢复" Tag="RESUME_CLIENT" Click="Control_Click" />
-                <ComboBox x:Name="LayoutPreset" Width="115" SelectedIndex="0" SelectionChanged="Layout_Changed"><ComboBoxItem Content="默认布局" /><ComboBoxItem Content="对象排查" /><ComboBoxItem Content="日志排查" /><ComboBoxItem Content="性能观察" /></ComboBox>
-                <Button Content="保存现场…" Click="SaveIncident_Click" ToolTip="打包已缓存快照、近期日志、FPS 与最近图片，不等待全场景采集" />
-                <CheckBox x:Name="AutoStats" Content="采集 FPS" IsChecked="True" />
-            </WrapPanel>
-            <TextBlock x:Name="StatsLabel" Text="启动监听后，在游戏中执行 /connect 本机IP 9555。" Foreground="#9FB7CD" Margin="3,0,0,10" />
+            <Border x:Name="NavigationBar" Background="#1A2533" CornerRadius="6" Padding="10,4" Margin="0,0,0,4">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center"><TextBlock Text="REMOTE INSPECTOR" FontSize="15" FontWeight="SemiBold" Foreground="#EDF5FF"/></StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="NavigateScene" GroupName="MainWorkspace" Content="场景调试" Style="{StaticResource WorkspaceNavigation}" IsChecked="{Binding IsSelected, ElementName=SceneWorkspaceTab, Mode=TwoWay}" ToolTip="节点、属性、日志与文件 · Alt+1"/>
+                        <RadioButton x:Name="NavigatePerformance" GroupName="MainWorkspace" Content="性能监测" Style="{StaticResource WorkspaceNavigation}" IsChecked="{Binding IsSelected, ElementName=FpsTab, Mode=TwoWay}" ToolTip="FPS、卡顿与堆栈 · Alt+2"/>
+                        <RadioButton x:Name="NavigateRpc" GroupName="MainWorkspace" Content="RPC 调用" Style="{StaticResource WorkspaceNavigation}" IsChecked="{Binding IsSelected, ElementName=RpcTab, Mode=TwoWay}" ToolTip="程序集、方法与参数 · Alt+3"/>
+                    </StackPanel>
+                    <Button x:Name="MoreActions" Grid.Column="2" Content="更多操作 ▾" Style="{StaticResource PerformanceButton}" Click="MoreActions_Click" VerticalAlignment="Center">
+                        <Button.ContextMenu><ContextMenu x:Name="HeaderActionsMenu" Opened="HeaderActions_Opened" Background="#F3F6FA" Foreground="#142335" BorderBrush="#9BAFC4">
+                            <ContextMenu.Resources><Style TargetType="MenuItem"><Setter Property="Foreground" Value="#142335"/><Setter Property="Background" Value="#F3F6FA"/><Setter Property="Padding" Value="8,5"/></Style></ContextMenu.Resources><MenuItem x:Name="SessionOperationsMenu" Header="会话控制"><MenuItem Header="暂停游戏" Tag="PAUSE_CLIENT" Click="Control_Click"/><MenuItem Header="恢复游戏" Tag="RESUME_CLIENT" Click="Control_Click"/><Separator/><MenuItem Header="断开当前会话" Foreground="#A32323" Click="Disconnect_Click"/></MenuItem>
+                            <MenuItem Header="布局预设"><MenuItem x:Name="LayoutDefault" Header="默认布局" Tag="0" Click="HeaderLayout_Click"/><MenuItem Header="对象排查" Tag="1" Click="HeaderLayout_Click"/><MenuItem x:Name="LayoutLogs" Header="日志排查" Tag="2" Click="HeaderLayout_Click"/><MenuItem Header="性能观察" Tag="3" Click="HeaderLayout_Click"/></MenuItem>
+                            <Separator/><MenuItem Header="保存诊断现场…" Click="SaveIncident_Click" ToolTip="导出已缓存快照、近期日志、FPS 与最近图片"/>
+                        </ContextMenu></Button.ContextMenu>
+                    </Button>
+                </Grid>
+            </Border>
+            <Border x:Name="ConnectionBar" Background="#182330" CornerRadius="6" Padding="10,3" Margin="0,0,0,6">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="24"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="端口" VerticalAlignment="Center" Foreground="#8CA6BF" Margin="2,0,7,0"/><TextBox x:Name="PortBox" Text="9555" Width="76" Height="32" Style="{StaticResource PerformanceInput}" Padding="7,4" VerticalContentAlignment="Center"/><Button x:Name="ListenButton" Content="启动监听" Click="Listen_Click" Style="{StaticResource PerformancePrimaryButton}" MinWidth="94" Margin="8,0,0,0"/></StackPanel>
+                    <TextBlock Grid.Column="2" Text="设备" Foreground="#8CA6BF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="SessionsBox" Grid.Column="3" DisplayMemberPath="DisplayName" SelectionChanged="Session_Changed" Height="32" MinWidth="210" MaxWidth="520" HorizontalAlignment="Left" Width="360" Margin="0"/>
+                    <Button x:Name="DisconnectDevice" Grid.Column="4" Content="断开设备" Click="Disconnect_Click" Style="{StaticResource PerformanceButton}" Margin="8,0,0,0"/><Border Grid.Column="5" Background="#20352F" CornerRadius="5" Padding="12,6" Margin="12,0,0,0"><TextBlock x:Name="HeaderConnectionState" Text="未监听" Foreground="#85CDB5" VerticalAlignment="Center"/></Border>
+                </Grid>
+            </Border>
         </StackPanel>
         <Border DockPanel.Dock="Bottom" Background="#202D3D" Padding="9" Margin="0,10,0,0">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="取消操作" Click="Cancel_Click" />
-                <TextBlock x:Name="OperationLabel" DockPanel.Dock="Right" Margin="12,0" VerticalAlignment="Center" Foreground="#EDC77F" />
+                <TextBlock x:Name="StatsLabel" DockPanel.Dock="Right" Text="启动监听后，在游戏中执行 /connect 本机IP 9555。" Foreground="#7896B2" MaxWidth="390" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" VerticalAlignment="Center" Margin="8,0"/><TextBlock x:Name="OperationLabel" DockPanel.Dock="Right" Margin="12,0" VerticalAlignment="Center" Foreground="#EDC77F" />
                 <TextBlock x:Name="StatusLabel" Text="就绪" VerticalAlignment="Center" TextWrapping="Wrap" />
             </DockPanel>
         </Border>
-        <Grid x:Name="Workspace">
-            <Grid.RowDefinitions>
+        <Grid x:Name="SharedWorkspace">            <Grid.RowDefinitions>
                 <RowDefinition x:Name="UpperHeight" Height="*" MinHeight="260" />
-                <RowDefinition Height="7" />
+                <RowDefinition Height="30" />
                 <RowDefinition x:Name="ToolsHeight" Height="290" MinHeight="215" />
-            </Grid.RowDefinitions>
+            </Grid.RowDefinitions><TabControl Grid.Row="0" SelectedIndex="0" x:Name="WorkspacePages" SelectionChanged="WorkspacePages_Changed" ItemContainerStyle="{StaticResource PerformanceTab}" Background="#141A23"><TabControl.Template><ControlTemplate TargetType="TabControl"><Border Background="{TemplateBinding Background}"><ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/></Border></ControlTemplate></TabControl.Template><TabItem Header="场景调试" x:Name="SceneWorkspaceTab"><Grid x:Name="Workspace">
+
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="0.3*" MinWidth="230" x:Name="TreeWidthColumn" />
@@ -67,7 +75,7 @@
                     <TextBlock x:Name="TreeSourceLabel" DockPanel.Dock="Top" Foreground="#EDC77F" TextWrapping="Wrap" Margin="4,3,4,7" FontSize="11" />
                     <Expander DockPanel.Dock="Top" Header="截图相交节点" x:Name="PickResultsPanel" Visibility="Collapsed" IsExpanded="True"><ListBox x:Name="PickResults" MaxHeight="160" SelectionChanged="PickResult_Selected"><ListBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding Kind}" Foreground="#60758B" FontSize="11" /></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox></Expander>
                     <TextBlock x:Name="TreeCount" DockPanel.Dock="Bottom" Foreground="#9FB7CD" Margin="3,7" TextWrapping="Wrap" />
-                    <TreeView x:Name="NodeTree" RequestBringIntoView="Tree_RequestBringIntoView" ScrollViewer.CanContentScroll="True" VirtualizingPanel.ScrollUnit="Pixel" PreviewMouseRightButtonDown="WatchTree_RightClick" ContextMenuOpening="WatchTree_MenuOpening" Background="#1C2430" BorderThickness="0" SelectedItemChanged="Tree_Selected" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling" TreeViewItem.Expanded="Tree_Expanded" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <TreeView x:Name="NodeTree" local:SearchHighlight.Query="{Binding Text, ElementName=SearchBox}" RequestBringIntoView="Tree_RequestBringIntoView" ScrollViewer.CanContentScroll="True" VirtualizingPanel.ScrollUnit="Pixel" PreviewMouseRightButtonDown="WatchTree_RightClick" ContextMenuOpening="WatchTree_MenuOpening" Background="#1C2430" BorderThickness="0" SelectedItemChanged="Tree_Selected" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling" TreeViewItem.Expanded="Tree_Expanded" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <TreeView.ContextMenu><ContextMenu><MenuItem Header="加入监听" Click="AddNodeWatch_Click" /><MenuItem Header="移除监听" Click="RemoveTreeWatch_Click" /><Separator /><MenuItem Header="收藏节点" Click="TreeFavorite_Click" /></ContextMenu></TreeView.ContextMenu>
                         <TreeView.Resources>
                             <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#31597D" />
@@ -109,7 +117,7 @@
                                     <Button Content="记录基准" Click="Baseline_Click" /><Button Content="清除基准" Tag="clear" Click="Baseline_Click" /><CheckBox x:Name="OnlyChanges" Content="只看变化" Click="Changes_Click" /><Button Content="还原未应用编辑" Click="RevertEdits_Click" /></WrapPanel>
                                 </StackPanel></Expander>
                             </StackPanel>
-                            <DataGrid x:Name="PropertiesGrid" ItemsSource="{Binding PropertyRows}" SizeChanged="PropertiesGrid_SizeChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizingWhenGrouping="True">
+                            <DataGrid x:Name="PropertiesGrid" local:SearchHighlight.Query="{Binding Text, ElementName=PropertySearch}" ItemsSource="{Binding PropertyRows}" SizeChanged="PropertiesGrid_SizeChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizingWhenGrouping="True">
                                 <DataGrid.RowStyle><Style TargetType="DataGridRow"><Setter Property="Opacity" Value="{Binding ParameterOpacity}" /><Style.Triggers><DataTrigger Binding="{Binding IsChanged}" Value="True"><Setter Property="Background" Value="#FFF0CE" /></DataTrigger><DataTrigger Binding="{Binding IsDirty}" Value="True"><Setter Property="Background" Value="#FFE0A5" /></DataTrigger></Style.Triggers></Style></DataGrid.RowStyle>
                                 <DataGrid.ColumnHeaderStyle>
                                     <Style TargetType="DataGridColumnHeader">
@@ -177,7 +185,7 @@
                                     </GroupStyle>
                                 </DataGrid.GroupStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="属性" Binding="{Binding DisplayLabel}" IsReadOnly="True" Width="2*" />
+                                    <DataGridTemplateColumn Header="属性" IsReadOnly="True" Width="2*"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock local:SearchHighlight.Text="{Binding DisplayLabel}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
                                     <DataGridTextColumn Header="类型" Binding="{Binding Type}" IsReadOnly="True" Width="110" />
                                     <DataGridTemplateColumn Header="值" Width="2*">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -263,7 +271,83 @@
                     <TabItem Header="动态监视" x:Name="MonitorTab"><TabControl x:Name="WatchTabs"><TabItem Header="节点与组件"><DockPanel Margin="8"><WrapPanel DockPanel.Dock="Top"><Button Content="监听所选节点" Click="AddNodeWatch_Click" /><Button Content="移除节点监听" Click="RemoveNodeWatch_Click" /><Button Content="定位监听节点" Click="JumpNodeWatch_Click" /><Button Content="立即采样" Click="SampleWatches_Click" /><CheckBox x:Name="AutoWatchNodes" Content="自动监听" IsChecked="True" /><ComboBox x:Name="WatchInterval" SelectedIndex="1" Width="90"><ComboBoxItem Content="每 1 秒" /><ComboBoxItem Content="每 2 秒" /><ComboBoxItem Content="每 5 秒" /></ComboBox></WrapPanel><DataGrid x:Name="NodeWatchGrid" DockPanel.Dock="Top" Height="125" IsReadOnly="True" ItemsSource="{Binding NodeWatchRows}" MouseDoubleClick="JumpNodeWatch_Click"><DataGrid.Columns><DataGridTextColumn Header="监听节点（双击定位）" Binding="{Binding Path}" Width="*" /><DataGridTextColumn Header="状态" Binding="{Binding State}" Width="180" /><DataGridTextColumn Header="最近采样" Binding="{Binding Updated}" Width="95" /></DataGrid.Columns></DataGrid><DockPanel DockPanel.Dock="Top"><Button Content="清空变化记录" Click="ClearWatchChanges_Click" DockPanel.Dock="Right" /><TextBlock x:Name="WatchStatus" Text="右键场景节点加入监听；仅成功采样后确认销毁，采样间隔内的瞬时变化可能遗漏。" VerticalAlignment="Center" TextWrapping="Wrap" /></DockPanel><DataGrid x:Name="WatchChangesGrid" IsReadOnly="True" ItemsSource="{Binding NodeWatchChanges}" MouseDoubleClick="JumpWatchChange_Click"><DataGrid.Columns><DataGridTextColumn Header="时间" Binding="{Binding Time}" Width="90" /><DataGridTextColumn Header="对象" Binding="{Binding Path}" Width="*" /><DataGridTextColumn Header="变化" Binding="{Binding Kind}" Width="100" /><DataGridTextColumn Header="组件 / 字段" Binding="{Binding Field}" Width="*" /><DataGridTextColumn Header="之前" Binding="{Binding Before}" Width="*" /><DataGridTextColumn Header="当前" Binding="{Binding After}" Width="*" /></DataGrid.Columns></DataGrid></DockPanel></TabItem>                    <TabItem Header="固定属性"><DockPanel Margin="10"><WrapPanel DockPanel.Dock="Top"><TextBlock Text="固定属性 · 按会话保存 · 值来自该节点最近一次详情读取" VerticalAlignment="Center" /><Button Content="移除所选" Click="UnpinProperty_Click" /><Button Content="刷新监视值" Click="RefreshMonitor_Click" /></WrapPanel><DataGrid x:Name="MonitorGrid" IsReadOnly="True" ItemsSource="{Binding MonitorRows}"><DataGrid.Columns><DataGridTextColumn Header="对象" Binding="{Binding Path}" Width="2*" /><DataGridTextColumn Header="属性" Binding="{Binding Label}" Width="2*" /><DataGridTextColumn Header="值" Binding="{Binding Value}" Width="*" /><DataGridTextColumn Header="更新时间" Binding="{Binding Updated}" Width="100" /></DataGrid.Columns></DataGrid></DockPanel></TabItem></TabControl></TabItem>
                 </TabControl>
             </Grid>
-            <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" Background="#344254" />
+
+        </Grid></TabItem>
+<TabItem Header="FPS / 卡顿" x:Name="FpsTab">
+                        <DockPanel Margin="8" Background="#1B2532">
+                            <DockPanel.Resources>
+                                <Style TargetType="Button" BasedOn="{StaticResource PerformanceButton}"/>
+                                <Style TargetType="TabItem" BasedOn="{StaticResource PerformanceTab}"/>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource PerformanceInput}"/>
+                            </DockPanel.Resources>
+                            <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,5">
+                                <CheckBox x:Name="AutoStats" Content="自动采集 FPS" IsChecked="True" VerticalAlignment="Center" Margin="4,0,12,0"/><Button x:Name="CaptureMainStack" Style="{StaticResource PerformancePrimaryButton}" Content="业务采样窗口" Click="CaptureMainStack_Click" />
+                                <CheckBox x:Name="AutoCaptureStack" Content="连续业务采样" Margin="6,0" ToolTip="连续执行业务采样窗口；每个窗口内按SDK限频采集并保留记录"/><ComboBox x:Name="BusinessWindowLength" Width="85" SelectedIndex="0"><ComboBoxItem Content="窗口5秒"/><ComboBoxItem Content="窗口10秒"/><ComboBoxItem Content="窗口20秒"/></ComboBox><ComboBox x:Name="CaptureStackInterval" Width="85" SelectedIndex="1"><ComboBoxItem Content="每1秒"/><ComboBoxItem Content="每2秒"/><ComboBoxItem Content="每5秒"/></ComboBox><ComboBox x:Name="PerformanceViewMode" Width="110" SelectedIndex="0" SelectionChanged="PerformanceViewMode_Changed"><ComboBoxItem Content="趋势与堆栈"/><ComboBoxItem Content="仅帧率趋势"/><ComboBoxItem Content="仅卡顿堆栈"/></ComboBox><Button Content="符号设置" Click="PerformanceSettings_Click" /><Button Content="清空记录" Click="ClearJanks_Click" ToolTip="只清除当前会话的本地卡顿记录" />
+                                <TextBlock x:Name="PerformanceFpsValue" Text="— FPS" Foreground="#74DCC3" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,6,0"/><TextBlock x:Name="JankCount" Text="等待事件" VerticalAlignment="Center" Foreground="#9FB7CD" Margin="5" />
+                            </WrapPanel>
+                            <TabControl SelectedIndex="0" Background="#1B2532"><TabControl.Template><ControlTemplate TargetType="TabControl"><ContentPresenter ContentSource="SelectedContent"/></ControlTemplate></TabControl.Template>
+                                <TabItem IsSelected="True" Header="性能总览" x:Name="JankTab"><Grid><Grid.RowDefinitions><RowDefinition x:Name="TrendHeight" Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><DockPanel x:Name="TrendPanel" Grid.Row="0">
+                                    <Border x:Name="TrendChart" DockPanel.Dock="Top" Height="115" Background="#141A23" Margin="0,3"><Canvas x:Name="FpsCanvas" ClipToBounds="True" SizeChanged="FpsCanvas_SizeChanged" /></Border>
+                                    <Expander Foreground="#91A9C3" Header="帧数据明细" IsExpanded="False"><DataGrid MaxHeight="140" x:Name="StatsGrid" Style="{StaticResource PerformanceGrid}" IsReadOnly="True" ItemsSource="{Binding FrameRows}"><DataGrid.Columns>
+                                        <DataGridTextColumn Header="时间" Binding="{Binding Time}" Width="*" />
+                                        <DataGridTextColumn Header="FPS" Binding="{Binding Fps, StringFormat=F1}" Width="*" />
+                                        <DataGridTextColumn Header="平均 ms" Binding="{Binding Avg, StringFormat=F2}" Width="*" />
+                                        <DataGridTextColumn Header="最小 ms" Binding="{Binding Min, StringFormat=F2}" Width="*" />
+                                        <DataGridTextColumn Header="最大 ms" Binding="{Binding Max, StringFormat=F2}" Width="*" />
+                                    </DataGrid.Columns></DataGrid></Expander>
+                                </DockPanel><Grid x:Name="JankWorkspace" Grid.Row="1">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="0.65*" MinWidth="280"/><ColumnDefinition Width="7"/><ColumnDefinition Width="1.35*"/></Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                    <DataGrid x:Name="JankGrid" Style="{StaticResource PerformanceGrid}" IsReadOnly="True" ItemsSource="{Binding JankRows}" SelectionChanged="Jank_Selected"><DataGrid.Columns>
+                                        <DataGridTextColumn Header="事件类型" Binding="{Binding Kind}" Width="76"/><DataGridTextColumn Header="发生时间" Binding="{Binding ShortTime}" Width="82" />
+                                        <DataGridTextColumn Header="持续 ms" Binding="{Binding DurationText}" Width="62" />
+                                        <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="*" />
+                                        <DataGridTextColumn Header="命中/采样" Binding="{Binding Samples}" Width="65" />
+                                        
+                                    </DataGrid.Columns></DataGrid></DockPanel>
+                                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" Background="#304155" />
+                                    <DockPanel Grid.Column="2">
+                                        <WrapPanel DockPanel.Dock="Top"><Button Content="解析" Click="ResolvePerformanceStack_Click" /><Button Content="原始" Click="RawPerformanceStack_Click" /><Button Content="复制" Click="CopyPerformanceStack_Click" /><Button Content="导出" Click="ExportPerformanceStack_Click" /><Button x:Name="EnlargePerformanceStack" Content="⤢" ToolTip="放大查看堆栈" Click="EnlargePerformanceStack_Click" /></WrapPanel>
+                                        <TextBlock x:Name="PerformanceStackInfo" DockPanel.Dock="Top" Text="选择卡顿记录查看堆栈" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Foreground="#9FB7CD" Margin="3" MaxHeight="54" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="PerformanceResolveStatus" DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#EDC77F" />
+                                        <TextBox x:Name="PerformanceStackText" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                                    </DockPanel>
+                                </Grid></Grid></TabItem>
+                            </TabControl>
+                        </DockPanel>
+                    </TabItem>
+<TabItem Header="RPC" x:Name="RpcTab"><DockPanel Margin="12" Background="#141D29">
+<DockPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource PerformanceButton}"/><Style TargetType="TextBox" BasedOn="{StaticResource PerformanceInput}"/></DockPanel.Resources>
+<DockPanel DockPanel.Dock="Top" Margin="4,0,4,10"><StackPanel><TextBlock Text="远程调用" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="按需刷新 · 精确选择重载与实例 · 远端执行耗时" Foreground="#7896B2" Margin="0,4,0,0"/></StackPanel></DockPanel>
+<WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8"><Button x:Name="ReflectionRpcBrowser" Content="独立查看" Click="ReflectionRpc_Click" ToolTip="程序集与类模糊查找；打开不自动获取列表" /><Button Visibility="Collapsed" x:Name="RpcRefreshFunctions" Content="刷新函数列表" Click="RpcRefreshAndShow_Click" /><Button Visibility="Collapsed" x:Name="RpcChooseFunction" Content="已注册函数 ▾" Click="RpcChoose_Click" Padding="9,4" /><TextBlock Text="热更新" Foreground="#9FB7CD" VerticalAlignment="Center" Margin="10,0,4,0" /><Button x:Name="RpcIFixButton" Content="重载 IFix" Tag="InitInjectFix" Click="QuickRpc_Click" Padding="9,4" /><Button x:Name="RpcILRuntimeButton" Content="重载 ILRuntime" Tag="InitILRuntimeFix" Click="QuickRpc_Click" Padding="9,4" /><TextBlock x:Name="RpcToolStatus" Foreground="#EDC77F" TextWrapping="Wrap" FontSize="11" Margin="4,0" /></WrapPanel>
+<TabControl x:Name="RpcModes" Background="#141D29" ItemContainerStyle="{StaticResource PerformanceTab}"><TabControl.Template><ControlTemplate TargetType="TabControl"><ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/></ControlTemplate></TabControl.Template>
+<TabItem Header="类与方法"><ContentControl x:Name="ReflectionRpcHost"><TextBlock Text="连接游戏后，点击刷新目录开始查找。" Margin="20" Foreground="#8EB5D5"/></ContentControl></TabItem>
+<TabItem Header="已注册函数" Visibility="Collapsed"><Grid Margin="4,8,4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="0.85*" MinWidth="220"/><ColumnDefinition Width="7"/><ColumnDefinition Width="1.15*" MinWidth="320"/><ColumnDefinition Width="7"/><ColumnDefinition Width="1.2*" MinWidth="330"/></Grid.ColumnDefinitions>
+<DockPanel Grid.Column="0" Background="#1B2837" Margin="0,0,8,0"><TextBlock DockPanel.Dock="Top" Text="已注册函数" FontSize="16" FontWeight="SemiBold" Margin="12"/><TextBox x:Name="RegisteredSearch" DockPanel.Dock="Top" Text="{Binding Text, ElementName=RpcFunctionSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="8" ToolTip="过滤缓存的函数名称、签名与说明"/>
+<TextBlock DockPanel.Dock="Bottom" Text="点击顶部刷新按钮获取函数；选择函数后配置参数。" TextWrapping="Wrap" Margin="10" Foreground="#7896B2"/>
+<ListBox x:Name="RegisteredFunctions" local:SearchHighlight.Query="{Binding Text, ElementName=RegisteredSearch}" SelectionChanged="RpcRegistered_Selected" Background="#19232F" Foreground="#D1DEEC" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><StackPanel Margin="6,8"><TextBlock local:SearchHighlight.Text="{Binding Name}" FontWeight="SemiBold" Foreground="#C1E3FF"/><TextBlock local:SearchHighlight.Text="{Binding Signature}" Foreground="#91A9C3" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock local:SearchHighlight.Text="{Binding Description}" Foreground="#7896B2" TextWrapping="Wrap"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+</DockPanel><GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="#304155"/>
+
+                        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="RpcCompactPanel" Margin="8" PreviewKeyDown="Rpc_KeyDown"><StackPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource PerformanceButton}"/><Style TargetType="TextBox" BasedOn="{StaticResource PerformanceInput}"/></StackPanel.Resources><TextBlock Text="调用配置" FontSize="16" FontWeight="SemiBold" Margin="4,4,4,14"/>
+                            
+                            
+                            <Popup x:Name="RpcFunctionPicker" PlacementTarget="{Binding ElementName=RpcChooseFunction}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                <Border Background="#202733" BorderBrush="#56718D" BorderThickness="1" Padding="8"><DockPanel Width="480" Height="260">
+                                    <DockPanel DockPanel.Dock="Top"><Button DockPanel.Dock="Right" Content="刷新列表" Click="RpcList_Click" /><TextBox x:Name="RpcFunctionSearch" TextChanged="RpcFunctionSearch_Changed" ToolTip="按函数名称、签名或说明搜索" /></DockPanel>
+                                    <TextBlock x:Name="RpcListStatus" DockPanel.Dock="Bottom" Foreground="#B7C9DB" Text="尚未获取函数列表" Margin="4" />
+                                    <DataGrid x:Name="RpcGrid" Style="{StaticResource PerformanceGrid}" IsReadOnly="True" SelectionMode="Single" SelectionChanged="Rpc_SelectionChanged"><DataGrid.Columns><DataGridTextColumn Header="方法" Binding="{Binding Name}" Width="*" /><DataGridTextColumn Header="签名" Binding="{Binding Signature}" Width="*" /><DataGridTextColumn Header="说明" Binding="{Binding Description}" Width="*" /></DataGrid.Columns></DataGrid>
+                                </DockPanel></Border>
+                            </Popup>
+                            <DockPanel><TextBlock Text="方法" Width="44" VerticalAlignment="Center" /><TextBox x:Name="RpcMethod" PreviewKeyDown="RpcSuggestion_KeyDown" TextChanged="RpcEditor_Changed" ToolTip="选择远端函数，或手动输入方法名称" /></DockPanel><Popup x:Name="RpcSuggestions" PlacementTarget="{Binding ElementName=RpcMethod}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True"><Border Background="#19232F" BorderBrush="#5AB4F4" BorderThickness="1" Padding="5" Width="420"><DockPanel><TextBlock DockPanel.Dock="Top" Text="缓存匹配 · ↑↓选择 · Enter 填入 · Esc 关闭" Foreground="#91A9C3" Margin="5"/><ListBox x:Name="RpcSuggestionList" local:SearchHighlight.Query="{Binding Text, ElementName=RpcMethod}" MaxHeight="220" Background="#19232F" Foreground="#D1DEEC" PreviewMouseLeftButtonUp="RpcSuggestion_MouseUp" PreviewKeyDown="RpcSuggestionList_KeyDown"><ListBox.ItemTemplate><DataTemplate><StackPanel Margin="5"><TextBlock local:SearchHighlight.Text="{Binding Name}"/><TextBlock local:SearchHighlight.Text="{Binding Signature}" Foreground="#91A9C3" TextWrapping="Wrap"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox></DockPanel></Border></Popup>
+                            <TextBlock x:Name="RpcSignature" Foreground="#9FB7CD" FontSize="11" Margin="47,0,3,2" TextTrimming="CharacterEllipsis" />
+                            <DockPanel><TextBlock Text="参数" Width="44" VerticalAlignment="Center" /><TextBox x:Name="RpcArgs" Text="[]" TextChanged="RpcEditor_Changed" AcceptsReturn="True" MinHeight="32" MaxHeight="72" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" ToolTip="JSON 数组，例如 [42, &quot;hello&quot;]；无参数填写 []；Ctrl+Enter 执行" /></DockPanel>
+                            <TextBlock x:Name="RpcValidation" Foreground="#F0ACAC" TextWrapping="Wrap" FontSize="11" Margin="47,0,3,0" />
+                            <DockPanel><Button x:Name="RpcExecute" DockPanel.Dock="Right" Content="执行 RPC" Click="Rpc_Click" Style="{StaticResource PerformancePrimaryButton}" Padding="12,4" ToolTip="Ctrl+Enter" /><WrapPanel><ComboBox x:Name="RpcTemplatePicker" Width="150" IsEditable="True" IsReadOnly="True" Text="参数模板…" DisplayMemberPath="Label" SelectionChanged="RpcTemplate_Changed" DropDownOpened="RpcTemplates_Opened" /><Button Content="保存模板" Click="SaveRpcTemplate_Click" Padding="8,4" /></WrapPanel></DockPanel>
+                            
+                        </StackPanel></ScrollViewer>
+                    <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Center" Background="#304155"/>
+<Border Grid.Column="4" Background="#19232F" CornerRadius="6"><Expander x:Name="RpcResultPanel" IsExpanded="True" HorizontalContentAlignment="Stretch" Foreground="#D5E3F1" Margin="12"><Expander.Header><WrapPanel><TextBlock Text="结果" Margin="0,0,10,0" /><TextBlock x:Name="RpcCallStatus" Text="尚未执行" MaxWidth="300" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" /></WrapPanel></Expander.Header><DockPanel><Button DockPanel.Dock="Top" Content="复制结果" Click="CopyRpcResult_Click" HorizontalAlignment="Right" Padding="8,3" /><TextBox x:Name="RpcResult" IsReadOnly="True" AcceptsReturn="True" MinHeight="80" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" /></DockPanel></Expander></Border></Grid></TabItem></TabControl></DockPanel></TabItem>
+</TabControl>            <DockPanel Grid.Row="1" Background="#202D3D"><Button x:Name="ToggleDiagnostics" DockPanel.Dock="Right" Content="最小化信息窗 ▾" Click="ToggleDiagnostics_Click" Padding="9,2"/><TextBlock Text="诊断信息 · 日志与远端文件" Foreground="#91A9C3" VerticalAlignment="Center" Margin="9,0"/></DockPanel><GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="#344254" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"/>
             <Grid Grid.Row="2" x:Name="ToolsWorkspace">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="0.4*" MinWidth="290" x:Name="DiagnosticsWidthColumn" />
@@ -285,66 +369,33 @@
                                 <Button Content="导出日志" Click="ExportLogs_Click" />
                             </WrapPanel>
                             <TextBox x:Name="LogDetails" DockPanel.Dock="Bottom" Height="70" Visibility="Collapsed" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" />
-                            <DataGrid x:Name="LogsGrid" PreviewMouseDown="Log_RightClick" SelectionMode="Single" IsReadOnly="True" ItemsSource="{Binding Logs}" SelectionChanged="Log_SelectionChanged" RowHeight="25">
+                            <DataGrid x:Name="LogsGrid" local:SearchHighlight.Query="{Binding Text, ElementName=LogFilter}" PreviewMouseDown="Log_RightClick" SelectionMode="Single" IsReadOnly="True" ItemsSource="{Binding Logs}" SelectionChanged="Log_SelectionChanged" RowHeight="25">
                                 <DataGrid.ContextMenu><ContextMenu><MenuItem Header="复制完整日志与堆栈" Tag="copy" Click="LogMenu_Click" /><MenuItem Header="筛选相同消息" Tag="filter" Click="LogMenu_Click" /></ContextMenu></DataGrid.ContextMenu>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="时间" Binding="{Binding Time}" Width="100" />
                                     <DataGridTextColumn Header="级别" Binding="{Binding Level}" Width="75" />
-                                    <DataGridTextColumn Header="消息 / 堆栈" Binding="{Binding Text}" Width="*" />
+                                    <DataGridTemplateColumn Header="消息 / 堆栈" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock local:SearchHighlight.Text="{Binding Text}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
                     </TabItem>
-                    <TabItem Header="FPS" x:Name="FpsTab">
-                        <DockPanel Margin="10">
-                            <TextBlock DockPanel.Dock="Top" Text="最近 180 个样本 · 仅所选会话" Margin="5" Foreground="#9FB7CD" />
-                            <Border DockPanel.Dock="Top" Height="160" Background="#141A23" Margin="0,5,0,12">
-                                <Canvas x:Name="FpsCanvas" ClipToBounds="True" SizeChanged="FpsCanvas_SizeChanged" />
-                            </Border>
-                            <DataGrid x:Name="StatsGrid" IsReadOnly="True" ItemsSource="{Binding FrameRows}">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="时间" Binding="{Binding Time}" Width="*" />
-                                    <DataGridTextColumn Header="FPS" Binding="{Binding Fps, StringFormat=F1}" Width="*" />
-                                    <DataGridTextColumn Header="平均 ms" Binding="{Binding Avg, StringFormat=F2}" Width="*" />
-                                    <DataGridTextColumn Header="最小 ms" Binding="{Binding Min, StringFormat=F2}" Width="*" />
-                                    <DataGridTextColumn Header="最大 ms" Binding="{Binding Max, StringFormat=F2}" Width="*" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </DockPanel>
-                    </TabItem>
-                    <TabItem Header="RPC" x:Name="RpcTab">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="RpcCompactPanel" Margin="8" PreviewKeyDown="Rpc_KeyDown">
-                            <WrapPanel><Button x:Name="RpcChooseFunction" Content="选择函数 ▾" Click="RpcChoose_Click" Padding="9,4" /><TextBlock Text="热更新" Foreground="#9FB7CD" VerticalAlignment="Center" Margin="10,0,4,0" /><Button x:Name="RpcIFixButton" Content="重载 IFix" Tag="InitInjectFix" Click="QuickRpc_Click" Padding="9,4" /><Button x:Name="RpcILRuntimeButton" Content="重载 ILRuntime" Tag="InitILRuntimeFix" Click="QuickRpc_Click" Padding="9,4" /></WrapPanel>
-                            <TextBlock x:Name="RpcToolStatus" Foreground="#EDC77F" TextWrapping="Wrap" FontSize="11" Margin="4,0" />
-                            <Popup x:Name="RpcFunctionPicker" PlacementTarget="{Binding ElementName=RpcChooseFunction}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-                                <Border Background="#202733" BorderBrush="#56718D" BorderThickness="1" Padding="8"><DockPanel Width="480" Height="260">
-                                    <DockPanel DockPanel.Dock="Top"><Button DockPanel.Dock="Right" Content="刷新列表" Click="RpcList_Click" /><TextBox x:Name="RpcFunctionSearch" TextChanged="RpcFunctionSearch_Changed" ToolTip="按函数名称、签名或说明搜索" /></DockPanel>
-                                    <TextBlock x:Name="RpcListStatus" DockPanel.Dock="Bottom" Foreground="#B7C9DB" Text="尚未获取函数列表" Margin="4" />
-                                    <DataGrid x:Name="RpcGrid" IsReadOnly="True" SelectionMode="Single" SelectionChanged="Rpc_SelectionChanged"><DataGrid.Columns><DataGridTextColumn Header="方法" Binding="{Binding Name}" Width="*" /><DataGridTextColumn Header="签名" Binding="{Binding Signature}" Width="*" /><DataGridTextColumn Header="说明" Binding="{Binding Description}" Width="*" /></DataGrid.Columns></DataGrid>
-                                </DockPanel></Border>
-                            </Popup>
-                            <DockPanel><TextBlock Text="方法" Width="44" VerticalAlignment="Center" /><TextBox x:Name="RpcMethod" TextChanged="RpcEditor_Changed" ToolTip="选择远端函数，或手动输入方法名称" /></DockPanel>
-                            <TextBlock x:Name="RpcSignature" Foreground="#9FB7CD" FontSize="11" Margin="47,0,3,2" TextTrimming="CharacterEllipsis" />
-                            <DockPanel><TextBlock Text="参数" Width="44" VerticalAlignment="Center" /><TextBox x:Name="RpcArgs" Text="[]" TextChanged="RpcEditor_Changed" AcceptsReturn="True" MinHeight="32" MaxHeight="72" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" ToolTip="JSON 数组，例如 [42, &quot;hello&quot;]；无参数填写 []；Ctrl+Enter 执行" /></DockPanel>
-                            <TextBlock x:Name="RpcValidation" Foreground="#F0ACAC" TextWrapping="Wrap" FontSize="11" Margin="47,0,3,0" />
-                            <DockPanel><Button x:Name="RpcExecute" DockPanel.Dock="Right" Content="执行 RPC" Click="Rpc_Click" Background="#9EC8ED" Padding="12,4" ToolTip="Ctrl+Enter" /><WrapPanel><ComboBox x:Name="RpcTemplatePicker" Width="150" IsEditable="True" IsReadOnly="True" Text="参数模板…" DisplayMemberPath="Label" SelectionChanged="RpcTemplate_Changed" DropDownOpened="RpcTemplates_Opened" /><Button Content="保存模板" Click="SaveRpcTemplate_Click" Padding="8,4" /></WrapPanel></DockPanel>
-                            <Expander x:Name="RpcResultPanel" IsExpanded="False" HorizontalContentAlignment="Stretch" Foreground="#D5E3F1" Margin="3,4,3,0"><Expander.Header><WrapPanel><TextBlock Text="结果" Margin="0,0,10,0" /><TextBlock x:Name="RpcCallStatus" Text="尚未执行" MaxWidth="300" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" /></WrapPanel></Expander.Header><DockPanel><Button DockPanel.Dock="Top" Content="复制结果" Click="CopyRpcResult_Click" HorizontalAlignment="Right" Padding="8,3" /><TextBox x:Name="RpcResult" IsReadOnly="True" AcceptsReturn="True" MinHeight="65" MaxHeight="200" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" /></DockPanel></Expander>
-                        </StackPanel></ScrollViewer>
-                    </TabItem>
+                    
+                    
                 </TabControl>
                 <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch" Background="#344254" />
-                <TabControl x:Name="RemoteFilesTabs" Grid.Column="2" Margin="8,0,0,0"><TabItem Header="远端文件"><DockPanel x:Name="FilesPane" Background="#202733">
+                <TabControl x:Name="RemoteFilesTabs" Grid.Column="2" Margin="8,0,0,0"><TabItem Header="远端文件"><DockPanel AllowDrop="True" PreviewDragOver="Files_DragOver" PreviewDrop="Files_Drop" x:Name="FilesPane" Background="#202733"><DockPanel.ContextMenu><ContextMenu x:Name="RemoteFilesMenu" Opened="RemoteFilesMenu_Opened" Background="#F3F6FA" Foreground="#142335"><ContextMenu.Resources><Style TargetType="MenuItem"><Setter Property="Foreground" Value="#142335"/><Setter Property="Background" Value="#F3F6FA"/><Setter Property="Padding" Value="8,5"/></Style></ContextMenu.Resources><MenuItem x:Name="CreateRemoteFolder" Header="新建文件夹…" Click="Mkdir_Click"/><MenuItem x:Name="UploadRemoteFiles" Header="上传文件到当前目录…" Click="Upload_Click"/><Separator/><MenuItem x:Name="DownloadRemoteSelection" Header="下载所选项" Click="Download_Click"/><MenuItem x:Name="DeleteRemoteSelection" Header="删除所选项…" Click="Delete_Click"/></ContextMenu></DockPanel.ContextMenu>
                     <StackPanel DockPanel.Dock="Top">
                         <DockPanel>
-                            <TextBlock Text="远端文件" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,3" />
-                            <WrapPanel HorizontalAlignment="Right">
+                            
+                            <WrapPanel HorizontalAlignment="Left">
                                 <Button Content="上级" Click="Parent_Click" Padding="9,3" />
                                 <Button Content="刷新目录" Click="Browse_Click" Padding="9,3" />
                                 <Button Content="下载所选" Click="Download_Click" Padding="9,3" />
                                 <Button Content="删除所选" Click="Delete_Click" Padding="9,3" />
                             </WrapPanel>
                         </DockPanel>
-                        <ItemsControl x:Name="PathBreadcrumbs" ItemsSource="{Binding Breadcrumbs}" Margin="3,0">
+                        <DockPanel Margin="0,1"><Expander x:Name="RelativePathPanel" Header="相对路径" IsExpanded="False" Foreground="#91A8BF" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,2,4,2"/>
+                        <ItemsControl ToolTip="{Binding Text, ElementName=PersistentPath}" x:Name="PathBreadcrumbs" ItemsSource="{Binding Breadcrumbs}" Margin="3,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -358,38 +409,16 @@
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock x:Name="PersistentPath" Foreground="#91A8BF" FontSize="11" Margin="6,2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
-                        <Expander Header="路径输入 / 上传 / 新建目录" Foreground="#CAD9E8" Margin="4,2" IsExpanded="False">
-                            <StackPanel>
-                                <DockPanel>
-                                    <TextBlock Text="相对路径" Width="64" VerticalAlignment="Center" />
-                                    <Button DockPanel.Dock="Right" Content="转到" Click="Browse_Click" />
-                                    <TextBox x:Name="RemotePath" KeyDown="RemotePath_KeyDown" ToolTip="相对于 persistentDataPath，空值表示根目录；Enter 跳转" />
-                                </DockPanel>
-                                <DockPanel>
-                                    <TextBlock Text="新目录" Width="64" VerticalAlignment="Center" />
-                                    <Button DockPanel.Dock="Right" Content="新建目录" Click="Mkdir_Click" />
-                                    <TextBox x:Name="NewDirectory" ToolTip="目录名称" />
-                                </DockPanel>
-                                <DockPanel>
-                                    <TextBlock Text="上传到" Width="64" VerticalAlignment="Center" />
-                                    <Button DockPanel.Dock="Right" Content="选择文件上传" Click="Upload_Click" />
-                                    <TextBox x:Name="UploadPath" ToolTip="留空上传到当前目录；也可指定相对文件路径" />
-                                </DockPanel>
-                            </StackPanel>
-                        </Expander>
+                        </ItemsControl></DockPanel>
+                        <DockPanel Margin="4,2,3,4" Visibility="{Binding IsExpanded, ElementName=RelativePathPanel, Converter={StaticResource ShowWhenTrue}}"><Button DockPanel.Dock="Right" Content="转到" Click="Browse_Click"/><TextBox x:Name="RemotePath" KeyDown="RemotePath_KeyDown" ToolTip="相对于 persistentDataPath；Enter 跳转，空值表示根目录"/></DockPanel>
+                        <TextBlock Visibility="Collapsed" x:Name="PersistentPath" Foreground="#91A8BF" FontSize="11" Margin="6,2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+
+
+
                     </StackPanel>
-                    <TextBlock x:Name="TransferStatus" DockPanel.Dock="Bottom" Margin="6,4" TextWrapping="Wrap" Foreground="#EDC77F" />
-                    <DataGrid x:Name="FilesGrid" IsReadOnly="True" MouseDoubleClick="File_DoubleClick" PreviewMouseDown="File_RightClick" SelectionMode="Single">
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="下载所选项" Click="Download_Click" />
-                                <MenuItem Header="上传文件到当前目录" Click="Upload_Click" />
-                                <Separator />
-                                <MenuItem Header="删除所选项…" Click="Delete_Click" />
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
+                    <TextBlock x:Name="TransferStatus" DockPanel.Dock="Bottom" Margin="6,3" MaxHeight="38" TextTrimming="CharacterEllipsis" Foreground="#EDC77F" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                    <DataGrid x:Name="FilesGrid" ToolTip="右键新建文件夹或上传文件；也可拖入文件上传到当前目录" IsReadOnly="True" MouseDoubleClick="File_DoubleClick" PreviewMouseDown="File_RightClick" SelectionMode="Single">
+
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="类型" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Icon}" FontFamily="Segoe UI Emoji" FontSize="16" Margin="4,0" /><TextBlock Text="{Binding Kind}" VerticalAlignment="Center" /></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
                             <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="2*" />
@@ -399,6 +428,6 @@
                     </DataGrid>
                 </DockPanel></TabItem><TabItem Header="压缩日志" x:Name="CompressedLogTab"><ContentControl x:Name="CompressedLogContent"><TextBlock Text="双击远端 .logcompr 文件，在此查看解码日志。" Margin="12" TextWrapping="Wrap" /></ContentControl></TabItem></TabControl>
             </Grid>
-        </Grid>
+</Grid>
     </DockPanel>
 </Window>

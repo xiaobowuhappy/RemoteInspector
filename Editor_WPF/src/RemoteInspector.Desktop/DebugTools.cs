@@ -43,16 +43,15 @@ public partial class MainWindow
         catch (Exception ex) { if (!closing) StatusLabel.Text = "自动刷新：" + ex.Message; }
         finally { if (autoDetailRequest == refresh) autoDetailRequest = null; autoDetailBusy = false; }
     }
-    private void Layout_Changed(object sender, SelectionChangedEventArgs e)
+    private void ApplyLayoutPreset(int index)
     {
         if (DataContext == null || ToolsHeight == null) return;
-        int index = LayoutPreset.SelectedIndex;
         double ratio = index == 1 ? .26 : .3;
         TreeWidthColumn.Width = new GridLength(ratio, GridUnitType.Star); InspectorWidthColumn.Width = new GridLength(1 - ratio, GridUnitType.Star);
         double logs = index is 2 or 3 ? .65 : .4;
         DiagnosticsWidthColumn.Width = new GridLength(logs, GridUnitType.Star); FilesWidthColumn.Width = new GridLength(1 - logs, GridUnitType.Star);
         ToolsHeight.Height = new GridLength(index == 1 ? 215 : index is 2 or 3 ? Math.Max(290, ActualHeight * .43) : 290);
-        if (index is 2 or 3) DiagnosticsTabs.SelectedIndex = index == 3 ? 1 : 0;
+        WorkspacePages.SelectedIndex = index == 3 ? 1 : 0;
     }
     private void PinProperty_Click(object sender, RoutedEventArgs e)
     {

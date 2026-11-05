@@ -35,9 +35,9 @@ public sealed class TreeProjection
         Parents = parents;
         string[] tokens = (search ?? "").Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
         Matches = Nodes.Values.Where(n => (stateFilter == 0 || n.activeInHierarchy == (stateFilter == 1)) &&
-            tokens.All(t => (n.name ?? "").Contains(t, StringComparison.OrdinalIgnoreCase) ||
-                (n.path ?? "").Contains(t, StringComparison.OrdinalIgnoreCase) ||
-                (n.componentTypes?.Any(c => c.Contains(t, StringComparison.OrdinalIgnoreCase)) ?? false)))
+            tokens.All(t => SearchHighlight.Matches(n.name, t) ||
+                SearchHighlight.Matches(n.path, t) ||
+                (n.componentTypes?.Any(c => SearchHighlight.Matches(c, t)) ?? false)))
             .Select(n => n.instanceId).ToHashSet();
         Visible = new HashSet<int>(Matches);
         if (tokens.Length > 0 || stateFilter != 0)

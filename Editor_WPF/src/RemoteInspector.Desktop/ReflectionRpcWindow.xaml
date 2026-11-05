@@ -1,0 +1,1 @@
+<Window x:Class="RemoteInspector.Desktop.ReflectionRpcWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="RPC · 类与方法" Width="1160" Height="780" MinWidth="900" MinHeight="620" Background="#141D29" WindowStartupLocation="CenterOwner"/>

@@ -67,6 +67,7 @@ public partial class MainWindow : Window
     {
         settingsPath = settingsFile ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SuperMain", "RemoteInspector", "settings.json");
         InitializeComponent();
+        WorkspacePages.SelectedIndex = 0;
         DataContext = this;
         var properties = CollectionViewSource.GetDefaultView(PropertyRows);
         properties.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PropertyRow.ComponentGroup)));
@@ -94,6 +95,8 @@ public partial class MainWindow : Window
                 PortBox.Text = "9555";
                 if (settings != null)
                 {
+                    symbolDirectory = settings.SymbolDirectory ?? "";
+                    if (!string.IsNullOrWhiteSpace(settings.SymbolTool)) symbolTool = settings.SymbolTool;
                     foreach (var pair in settings.RpcTemplates ?? new()) rpcTemplates[pair.Key] = pair.Value;
                     double treeRatio = double.IsFinite(settings.TreeRatio) ? Math.Clamp(settings.TreeRatio, 0.18, 0.45) : 0.3;
                     TreeWidthColumn.Width = new GridLength(treeRatio, GridUnitType.Star); InspectorWidthColumn.Width = new GridLength(1 - treeRatio, GridUnitType.Star);
@@ -142,6 +145,9 @@ public partial class MainWindow : Window
     private async void Tick(object sender, EventArgs e)
     {
         foreach (var view in sessions) view.RefreshName();
+        UpdateHeaderConnection();
+        RefreshPerformance();
+        _ = PollDynamicStack();
         if (operation != null) OperationLabel.Text = $"{currentOperationName} · {(DateTime.UtcNow - operationStarted).TotalSeconds:F1}s";
         while (diagnostics.TryDequeue(out var message)) StatusLabel.Text = message;
         bool appendedLogs = false;
@@ -172,11 +178,12 @@ public partial class MainWindow : Window
         await AutoRefreshDetail();
         await PollNodeWatches();
         var s = selected.Session;
-        if (s.Tree != null && !ReferenceEquals(renderedTree, s.Tree)) RenderTree(s.Tree);
+        if (SceneWorkspaceTab.IsSelected && s.Tree != null && !ReferenceEquals(renderedTree, s.Tree)) RenderTree(s.Tree);
         if (s.Stats != null && !ReferenceEquals(selected.LastStats, s.Stats))
         {
             selected.LastStats = s.Stats;
             var stats = s.Stats;
+            PerformanceFpsValue.Text = $"{stats.fps:F1} FPS";
             FrameRows.Insert(0, new FrameRow(DateTime.Now.ToString("HH:mm:ss"), stats.fps, stats.avgFrameTime, stats.minFrameTime, stats.maxFrameTime));
             if (FrameRows.Count > 180) FrameRows.RemoveAt(FrameRows.Count - 1);
             DrawFps();
@@ -239,6 +246,8 @@ public partial class MainWindow : Window
     { try { Live().Disconnect(); StatusLabel.Text = "所选会话已断开。"; } catch (Exception ex) { StatusLabel.Text = ex.Message; } }
     private void Session_Changed(object sender, SelectionChangedEventArgs e)
     {
+        AutoCaptureStack.IsChecked = false; dynamicStackRequest?.Cancel();
+        currentRemoteDirectory = "";
         ClearRemoteLog();
         nodeWatchRequest?.Cancel();
         autoDetailRequest?.Cancel();
@@ -273,7 +282,7 @@ public partial class MainWindow : Window
     { var s = Live(); await s.RefreshTreeAsync(token); if (IsCurrent(s)) { RenderTree(s.Tree); StatusLabel.Text = "节点树已刷新。"; } });
     private async void Control_Click(object sender, RoutedEventArgs e) => await Run(async token =>
     {
-        var s = Live(); var command = Enum.Parse<Command>((string)((Button)sender).Tag);
+        var s = Live(); var command = Enum.Parse<Command>((string)((FrameworkElement)sender).Tag);
         await s.RequestAsync(command, new RequestBase(), token, 15, command);
         StatusLabel.Text = command == Command.PAUSE_CLIENT ? "游戏已暂停。" : "游戏已恢复。";
     });
@@ -551,7 +560,7 @@ public partial class MainWindow : Window
         if (value is not PropertyRow row) return false;
         if (OnlyChanges?.IsChecked == true && !row.IsChanged) return false;
         string text = PropertySearch?.Text?.Trim() ?? "";
-        return text.Length == 0 || $"{row.ComponentGroup} {row.Section} {row.Label} {row.Type} {row.Value}".Contains(text, StringComparison.OrdinalIgnoreCase);
+        return text.Length == 0 || SearchHighlight.Matches($"{row.ComponentGroup} {row.Section} {row.Label} {row.Type} {row.Value}", text);
     }
     private void PropertiesGrid_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -596,7 +605,7 @@ public partial class MainWindow : Window
     }
     private void PropertyGroups_Click(object sender, RoutedEventArgs e)
     {
-        bool expand = bool.Parse((string)((Button)sender).Tag);
+        bool expand = bool.Parse((string)((FrameworkElement)sender).Tag);
         void Set(CollectionViewGroup group)
         {
             string key = PropertyGroupKey(group);
@@ -666,7 +675,7 @@ public partial class MainWindow : Window
     private bool FilterLog(object value)
     {
         if (value is not LogRow row) return false;
-        return row.Severity >= (LogLevel?.SelectedIndex ?? 0) && row.Text.Contains(LogFilter?.Text ?? "", StringComparison.OrdinalIgnoreCase);
+        return row.Severity >= (LogLevel?.SelectedIndex ?? 0) && SearchHighlight.Matches(row.Text, LogFilter?.Text);
     }
     private void LogFilter_Changed(object sender, TextChangedEventArgs e) { if (DataContext != null) CollectionViewSource.GetDefaultView(Logs).Refresh(); }
     private void LogLevel_Changed(object sender, SelectionChangedEventArgs e) { if (DataContext != null) CollectionViewSource.GetDefaultView(Logs).Refresh(); }
@@ -694,6 +703,7 @@ public partial class MainWindow : Window
             new FileBrowseListRequest { relativePath = path }, token, 15, Command.FILE_BROWSE_LIST_RESPONSE));
         if (!data.success) throw new IOException(data.error);
         if (!IsCurrent(s)) return;
+        currentRemoteDirectory = data.relativePath ?? "";
         RemotePath.Text = data.relativePath;
         UpdateBreadcrumbs(data.relativePath);
         PersistentPath.Text = data.persistentDataPath;
@@ -707,7 +717,7 @@ public partial class MainWindow : Window
     private async void RemotePath_KeyDown(object sender, KeyEventArgs e)
     { if (e.Key == Key.Enter) { e.Handled = true; await Run(t => Browse(Live(), RemotePath.Text.Trim(), t)); } }
     private async void Browse_Click(object sender, RoutedEventArgs e) => await Run(t => Browse(Live(), RemotePath.Text.Trim(), t));
-    private async void Parent_Click(object sender, RoutedEventArgs e) => await Run(t => Browse(Live(), ParentPath(RemotePath.Text), t));
+    private async void Parent_Click(object sender, RoutedEventArgs e) => await Run(t => Browse(Live(), ParentPath(currentRemoteDirectory), t));
     private static string ParentPath(string path) { path = path.Replace('\\', '/').Trim('/'); int index = path.LastIndexOf('/'); return index < 0 ? "" : path[..index]; }
     private static string Join(string parent, string child) => string.IsNullOrEmpty(parent) ? child : parent.TrimEnd('/') + "/" + child;
     private void File_RightClick(object sender, MouseButtonEventArgs e)
@@ -724,16 +734,6 @@ public partial class MainWindow : Window
             OpenRemoteLog(file);
     }
     private FileRow FileSelection() => FilesGrid.SelectedItem as FileRow ?? throw new InvalidOperationException("请先选择文件或目录。");
-    private async void Mkdir_Click(object sender, RoutedEventArgs e) => await Run(async token =>
-    {
-        var s = Live(); string name = NewDirectory.Text.Trim();
-        if (string.IsNullOrEmpty(name) || name is "." or ".." || name.Contains('/') || name.Contains('\\')) throw new ArgumentException("请输入单个目录名。");
-        string parent = RemotePath.Text;
-        var result = Wire.Body<FileBrowseMkdirResponse>(await s.RequestAsync(Command.FILE_BROWSE_MKDIR,
-            new FileBrowseMkdirRequest { relativePath = Join(parent, name) }, token, 15, Command.FILE_BROWSE_MKDIR_RESPONSE));
-        if (!result.success) throw new IOException(result.error);
-        await Browse(s, parent, token);
-    });
     private async void Delete_Click(object sender, RoutedEventArgs e) => await Run(async token =>
     {
         var s = Live(); var row = FileSelection();
@@ -751,17 +751,6 @@ public partial class MainWindow : Window
         await s.DownloadAsync(row.Path, row.IsDirectory, save.FileName, new Progress<string>(m => { StatusLabel.Text = m; TransferStatus.Text = m; }), token);
         StatusLabel.Text = "已下载到：" + save.FileName; TransferStatus.Text = StatusLabel.Text;
     });
-    private async void Upload_Click(object sender, RoutedEventArgs e) => await Run(async token =>
-    {
-        var s = Live(); var open = new OpenFileDialog();
-        if (open.ShowDialog(this) != true) return;
-        string path = string.IsNullOrWhiteSpace(UploadPath.Text) ? Join(RemotePath.Text, Path.GetFileName(open.FileName)) : UploadPath.Text.Trim();
-        TransferStatus.Text = "上传目标：" + path;
-        await s.UploadAsync(open.FileName, path, new Progress<string>(m => { StatusLabel.Text = m; TransferStatus.Text = m; }), token);
-        await Browse(s, ParentPath(path), token);
-        StatusLabel.Text = "上传完成：" + path; TransferStatus.Text = StatusLabel.Text;
-    });
-
     private void ShowImage(byte[] bytes, string label, bool screen = false)
     {
         pictures.Insert(0, new Picture(DateTime.Now.ToString("HH:mm:ss") + " · " + label, bytes, screen, Selected?.Session.Id ?? Guid.Empty));
@@ -905,6 +894,10 @@ public partial class MainWindow : Window
         if (closing) return;
         closing = true;
         compressedLog?.Dispose();
+        dynamicStackRequest?.Cancel();
+        symbolRequest?.Cancel();
+        reflectionRpcWindow?.Close();
+        embeddedRpcView?.Dispose();
         nodeWatchRequest?.Cancel();
         operation?.Cancel();
         autoDetailRequest?.Cancel();
@@ -925,6 +918,7 @@ public partial class MainWindow : Window
                 TreeRatio = TreeWidthColumn.ActualWidth / Math.Max(1, TreeWidthColumn.ActualWidth + InspectorWidthColumn.ActualWidth),
                 ToolsHeight = ToolsHeight.ActualHeight,
                 RpcTemplates = new Dictionary<string, string>(rpcTemplates),
+                SymbolDirectory = symbolDirectory, SymbolTool = symbolTool,
                 DiagnosticsRatio = DiagnosticsWidthColumn.ActualWidth / Math.Max(1, DiagnosticsWidthColumn.ActualWidth + FilesWidthColumn.ActualWidth)
             }));
         }
@@ -940,6 +934,8 @@ public partial class MainWindow : Window
     }
     private sealed class Settings
     {
+        public string SymbolDirectory { get; set; } = "";
+        public string SymbolTool { get; set; } = "";
         public Dictionary<string, string> RpcTemplates { get; set; } = new();
         public int Port { get; set; } = 9555;
         public double TreeRatio { get; set; } = 0.3;

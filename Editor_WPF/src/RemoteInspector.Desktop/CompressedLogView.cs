@@ -18,13 +18,14 @@ public sealed class CompressedLogView : UserControl, IDisposable
     private readonly DispatcherTimer repaint = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private readonly Button refresh = new() { Content = "刷新", Name = "RefreshCompressedLog" };
     private readonly CheckBox follow = new() { Content = "每 2 秒刷新" };
-    public TextBox Keyword { get; } = new() { Width = 170, ToolTip = "在当前显示文本中查找；Enter 下一处，Shift+Enter 上一处" };
+    public TextBox Keyword { get; } = new() { Width = 170, ToolTip = "支持分词和按字符顺序模糊查找；Enter 下一处，Shift+Enter 上一处" };
     public TextBox Text { get; } = new() { IsReadOnly = true, IsInactiveSelectionHighlightEnabled = true, AcceptsReturn = true, FontFamily = new FontFamily("Consolas"), HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     private readonly TextBlock state = new() { TextWrapping = TextWrapping.Wrap, FontSize = 11 };
     private readonly TextBlock matches = new() { VerticalAlignment = VerticalAlignment.Center };
     private string pendingText;
     private string lastKeyword = "";
     private readonly List<int> positions = new();
+    private readonly List<int> matchLengths = new();
     private int position = -1;
     private bool busy, disposed;
     public Guid SessionId => session.Id;
@@ -58,13 +59,25 @@ public sealed class CompressedLogView : UserControl, IDisposable
     }
     private void RebuildMatches()
     {
-        lastKeyword = Keyword.Text; positions.Clear(); position = -1;
-        if (lastKeyword.Length > 0)
-            for (int start = 0; start <= Text.Text.Length - lastKeyword.Length;)
+        lastKeyword = Keyword.Text; positions.Clear(); matchLengths.Clear(); position = -1;
+        if (!string.IsNullOrWhiteSpace(lastKeyword))
+        {
+            string content = Text.Text;
+            for (int lineStart = 0; lineStart < content.Length;)
             {
-                int found = Text.Text.IndexOf(lastKeyword, start, StringComparison.OrdinalIgnoreCase);
-                if (found < 0) break; positions.Add(found); start = found + lastKeyword.Length;
+                int lineEnd = content.IndexOf('\n', lineStart); if (lineEnd < 0) lineEnd = content.Length;
+                string line = content[lineStart..lineEnd]; int countBefore = positions.Count;
+                for (int cursor = 0; cursor <= line.Length - lastKeyword.Length;)
+                {
+                    int found = line.IndexOf(lastKeyword, cursor, StringComparison.OrdinalIgnoreCase);
+                    if (found < 0) break;
+                    positions.Add(lineStart + found); matchLengths.Add(lastKeyword.Length); cursor = found + lastKeyword.Length;
+                }
+                if (positions.Count == countBefore && SearchHighlight.TryMatchSpan(line, lastKeyword, out int offset, out int length))
+                { positions.Add(lineStart + offset); matchLengths.Add(length); }
+                lineStart = lineEnd + 1;
             }
+        }
         if (positions.Count == 0) Text.Select(0, 0);
         matches.Text = lastKeyword.Length == 0 ? "" : positions.Count == 0 ? "无匹配" : $"{positions.Count} 处";
     }
@@ -73,7 +86,7 @@ public sealed class CompressedLogView : UserControl, IDisposable
         if (lastKeyword != Keyword.Text) RebuildMatches();
         if (positions.Count == 0) return;
         position = position < 0 ? backwards ? positions.Count - 1 : 0 : (position + (backwards ? -1 : 1) + positions.Count) % positions.Count;
-        Text.Select(positions[position], lastKeyword.Length);
+        Text.Select(positions[position], matchLengths[position]);
         Text.ScrollToLine(Text.GetLineIndexFromCharacterIndex(positions[position]));
         matches.Text = $"{position + 1}/{positions.Count}";
     }
