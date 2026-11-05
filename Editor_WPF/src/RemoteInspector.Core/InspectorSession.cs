@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -9,7 +9,7 @@ using RemoteInspector.Core.Models;
 
 namespace RemoteInspector.Core;
 
-public sealed class InspectorSession : IAsyncDisposable
+public sealed partial class InspectorSession : IAsyncDisposable
 {
     private readonly TcpClient client;
     private readonly NetworkStream stream;
@@ -30,6 +30,28 @@ public sealed class InspectorSession : IAsyncDisposable
     public ClientHelloRequest Hello { get; private set; }
     public NodeTreeResponse Tree { get; private set; }
     public FrameStatsResponse Stats { get; private set; }
+    private readonly object jankGate = new();
+    private readonly List<PerformanceJank> janks = new();
+    private long jankRevision;
+    public long JankRevision => Interlocked.Read(ref jankRevision);
+    public PerformanceJank[] GetJanks() { lock (jankGate) return janks.ToArray(); }
+    public void ClearJanks() { lock (jankGate) { janks.Clear(); Interlocked.Increment(ref jankRevision); } }
+    private void AddJank(PerformanceJank value)
+    {
+        if (value == null || string.IsNullOrEmpty(value.eventId)) return;
+        if ((value.stacks?.Count ?? 0) > 256 || (value.stacks?.Sum(s => (long)(s.stack?.Length ?? 0)) ?? 0) > 512 * 1024) return;
+        lock (jankGate)
+        {
+            int i = janks.FindIndex(v => v.eventId == value.eventId);
+            if (i >= 0)
+            {
+                if (janks[i].status != "ongoing" && value.status == "ongoing") return;
+                janks[i] = value;
+            }
+            else { janks.Add(value); if (janks.Count > 200) janks.RemoveAt(0); }
+            Interlocked.Increment(ref jankRevision);
+        }
+    }
     public ConcurrentDictionary<int, NodeDetailResponse> Details { get; } = new();
     public ConcurrentDictionary<int, byte[]> Images { get; } = new();
     public string DisplayName => $"{Hello?.deviceName ?? Endpoint} [{Hello?.platform ?? "握手中"}]";
@@ -118,6 +140,7 @@ public sealed class InspectorSession : IAsyncDisposable
                 var detail = Wire.Body<NodeDetailResponse>(packet);
                 Details[detail.instanceId] = detail;
                 break;
+            case (Command)PerformanceProtocol.Jank: AddJank(Wire.Body<PerformanceJank>(packet)); break;
             case Command.FRAME_STATS_RESPONSE: Stats = Wire.Body<FrameStatsResponse>(packet); break;
             case Command.NODE_DETAIL_RESPONSE_BINARY:
                 throw new NotSupportedException("Runtime currently sends JSON details; binary detail codec is not supplied by the source project.");
