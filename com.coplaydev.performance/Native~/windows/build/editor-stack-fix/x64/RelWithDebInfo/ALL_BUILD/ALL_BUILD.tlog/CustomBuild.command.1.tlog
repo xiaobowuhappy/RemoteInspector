@@ -1,0 +1,10 @@
+^G:\MASTERACHIEVE\WATCHDOG\PACKAGES\COM.COMPANY.PERFORMANCE\NATIVE~\WINDOWS\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SG:/MasterAchieve/WatchDog/Packages/com.company.performance/Native~/windows -BG:/MasterAchieve/WatchDog/Packages/com.company.performance/Native~/windows/build/editor-stack-fix --check-stamp-file G:/MasterAchieve/WatchDog/Packages/com.company.performance/Native~/windows/build/editor-stack-fix/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

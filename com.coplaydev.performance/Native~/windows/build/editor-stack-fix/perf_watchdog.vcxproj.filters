@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="G:\MasterAchieve\WatchDog\Packages\com.company.performance\Native~\windows\perf_watchdog_windows.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="G:\MasterAchieve\WatchDog\Packages\com.company.performance\Native~\windows\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{25DFDEFB-0F76-3015-8B07-0D5F82673AA0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

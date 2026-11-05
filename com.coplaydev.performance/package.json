@@ -1,0 +1,16 @@
+{
+  "name": "com.coplaydev.performance",
+  "version": "0.8.0",
+  "displayName": "PerformanceSDK",
+  "description": "Lean Unity runtime jank detection, native stack capture and local persistence.",
+  "unity": "2021.3",
+  "author": {
+    "name": "coplaydev"
+  },
+  "keywords": [
+    "performance",
+    "jank",
+    "stall",
+    "telemetry"
+  ]
+}

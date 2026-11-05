@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>G:\MasterAchieve\WatchDog\Packages\com.company.performance\Native~\windows\build\x86_64-gmaster\x64\RelWithDebInfo\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>G:\MasterAchieve\WatchDog\Packages\com.company.performance\Native~\windows\build\x86_64-gmaster\RelWithDebInfo\perf_watchdog.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>G:\MasterAchieve\WatchDog\Packages\com.company.performance\Native~\windows\build\x86_64-gmaster\x64\RelWithDebInfo\ALL_BUILD</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

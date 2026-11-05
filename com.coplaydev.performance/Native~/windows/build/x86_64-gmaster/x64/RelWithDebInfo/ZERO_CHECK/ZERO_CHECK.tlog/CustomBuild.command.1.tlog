@@ -1,0 +1,10 @@
+^G:\MASTERACHIEVE\WATCHDOG\PACKAGES\COM.COMPANY.PERFORMANCE\NATIVE~\WINDOWS\BUILD\X86_64-GMASTER\CMAKEFILES\A30B4445F94575974346936ACE6B405D\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SG:/MasterAchieve/WatchDog/Packages/com.company.performance/Native~/windows -BG:/MasterAchieve/WatchDog/Packages/com.company.performance/Native~/windows/build/x86_64-gmaster --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file G:/MasterAchieve/WatchDog/Packages/com.company.performance/Native~/windows/build/x86_64-gmaster/perf_watchdog.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

@@ -1,0 +1,12 @@
+{
+  "name": "Coplaydev.Performance.Tests",
+  "rootNamespace": "Coplaydev.Performance.Tests",
+  "references": ["Coplaydev.Performance.Runtime"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "noEngineReferences": false
+}

@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "watchdogEnabled": true,
+  "nativeStackSamplingEnabled": true,
+  "longStallThresholdMs": 500,
+  "navigationTransientIgnoreMs": 1000,
+  "sessionSampleRate": 1.0,
+  "freezeMs": 1000,
+  "stackSampleOffsetsMs": [0, 50, 150, 350, 750, 1250],
+  "maxStackSamples": 6,
+  "maxStackSamplesPerMinute": 20,
+  "stackSamplingCooldownMs": 3000,
+  "buildId": "replace-from-ci"
+}
